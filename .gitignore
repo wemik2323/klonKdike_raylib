@@ -1,0 +1,10 @@
+/.vs
+**.sln
+**.vcxproj
+**.vcxproj.user
+
+Makefile
+compile_commands.json
+/.conan
+/build
+/.cache
