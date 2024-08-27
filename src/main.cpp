@@ -137,7 +137,7 @@ class HiddenPool {
     void showNextCard(Vector2 size) { 
         if (!cards.empty()) {
             Card card = cards.back();
-            card.position.x = position.x + size.x + 40;
+            card.position.x = position.x + (size.x * 5/4);
             card.isFaceUp = true;
             buffer.push_back(card);
             cards.pop_back();
@@ -155,6 +155,10 @@ class HiddenPool {
         }
     }
 
+    void updateCoords() {
+        position = {float(GetScreenWidth()) / 8, float(GetScreenHeight()) / 16};
+    }
+
     void drawHiddenPool(Texture2D& facecard, Texture2D& backcard,
                         Vector2 size) {
         for (int i = 0; i < cards.size(); i++) {
@@ -170,7 +174,7 @@ class HiddenPool {
             cards[i].position = position;
         }
         for (int i = 0; i < buffer.size(); i++) {
-            buffer[i].position.x = position.x + size.x + 40;
+            buffer[i].position.x = position.x + (size.x * 5/4);
             buffer[i].position.y = position.y;
         }
     }
@@ -183,7 +187,7 @@ class Table {
 
     void initializeTable(MainDeck& deck, Vector2 size, HiddenPool& hiddenPool) {
         for (int i = 0; i < 7; ++i) {
-            Vector2 position = {float(GetScreenWidth()/8 + i * (size.x + 10)), hiddenPool.position.y + size.y + 50};
+            Vector2 position = {float(GetScreenWidth()/8 + i * (size.x + size.x/20)), hiddenPool.position.y + size.y + size.y * 5/30};
             for (int j = 0; j <= i; ++j) {
                 Card card = deck.takeCard();
                 card.position = position;
@@ -194,9 +198,11 @@ class Table {
         }
     }
 
-    void refreshPositions(Vector2 size) {
+    void refreshPositions(Vector2 size, HiddenPool& hiddenPool) {
         for (int i = 0; i < 7; ++i) {
-            Vector2 position = {float(100 + i * (size.x + 10)), 200.0f};
+            Vector2 position = {
+                float(GetScreenWidth() / 8 + i * (size.x + size.x / 20)),
+                                hiddenPool.position.y + size.y + size.y * 5/30};
             for (size_t j = 0; j < columns[i].size(); ++j) {
                 columns[i][j].position = position;
                 position.y += 30;
@@ -204,10 +210,17 @@ class Table {
         }
     }
 
-    void drawTable(Vector2 size, Texture2D& facecard, Texture2D& backcard) {
+    void drawTable(Vector2 size, Texture2D& facecard, Texture2D& backcard, Texture2D& cock, HiddenPool& hiddenPool) {
         for (int i = 0; i < 7; ++i) {
-            for (size_t j = 0; j < columns[i].size(); ++j) {
-                columns[i][j].drawCard(size, facecard, backcard);
+            if (!columns[i].empty()) {
+                for (size_t j = 0; j < columns[i].size(); ++j) {
+                    columns[i][j].drawCard(size, facecard, backcard);
+                }
+            } else {
+                Vector2 position = {
+                    float(GetScreenWidth() / 8 + i * (size.x + size.x / 20)),
+                    hiddenPool.position.y + size.y + size.y * 5 / 30};
+                DrawTexturePro(cock, {0, 0, 225, 315}, {position.x, position.y, size.x, size.y}, {0, 0}, 0.0f, WHITE);
             }
         }
     }
@@ -233,15 +246,23 @@ class HomeCell {
     Vector2 position = {float(GetScreenWidth() / 2), float(GetScreenHeight() / 16)
 };
 
-    void drawHomeCells(Vector2 size, Texture2D& facecard, Texture2D& backcard) {
+    void drawHomeCells(Vector2 size, Texture2D& facecard, Texture2D& backcard, Texture2D& slot) {
         for (int i = 0; i < 4; ++i) {
             if (!cells[i].empty()) {
                 cells[i].back().drawCard(size, facecard, backcard);
             } else {
-                DrawRectangle(position.x + i * (size.x + 20), position.y, size.x, size.y,
-                              BLACK);
+                DrawRectangle(position.x + i * (size.x + size.x / 10),
+                              position.y, size.x, size.y, DARKGRAY);
+                DrawTexturePro(slot, {0, 0, 225, 315},
+                               { position.x + i * (size.x + size.x / 10),
+                                position.y, size.x, size.y},
+                               {0, 0}, 0.0f, WHITE);
             }
         }
+    }
+
+    void updateCoords() {
+        position = {float(GetScreenWidth() / 2), float(GetScreenHeight() / 16)};
     }
 
     bool canPlaceCard(Card card) {
@@ -255,7 +276,7 @@ class HomeCell {
     }
 
     void placeCard(Card card, Vector2 size) { 
-        card.position.x = this->position.x + card.suit * (20 + size.x);
+        card.position.x = this->position.x + card.suit * (size.x/10 + size.x);
         card.position.y = this->position.y;
         cells[card.suit].push_back(card); 
     }
@@ -265,7 +286,8 @@ Card* selectedCard = nullptr;
 int selectedColumn = -1;
 int selectedRow = -1;
 
-void CheckMouseInput(Table& table, HiddenPool& hiddenPool, HomeCell& homeCell, Vector2 size);
+void CheckMouseInput(Table& table, HiddenPool& hiddenPool, HomeCell& homeCell,
+                     Vector2 size, Texture2D& facecard, Texture2D& backcard);
 
 int main() {
     GameState gameState = MENU;
@@ -279,8 +301,13 @@ int main() {
         LoadTextureFromImage(LoadImage("../resources/spritesheet.png"));
     Texture2D backcard =
         LoadTextureFromImage(LoadImage("../resources/backcard.png"));
+    Texture2D slot = 
+        LoadTextureFromImage(LoadImage("../resources/slot.png"));
+    Texture2D cock = LoadTextureFromImage(LoadImage("../resources/niceCock.png"));
+    Texture2D bg =
+        LoadTextureFromImage(LoadImage("../resources/bg.jpg"));
 
-    Vector2 cardSize = {225 / 3.0f, 315 / 3.0f};
+    Vector2 cardSize = {GetScreenWidth() / 10, GetScreenHeight() / 6};
 
     MainDeck deck;
     deck.initializeDeck(cardSize);
@@ -295,8 +322,16 @@ int main() {
     SetTargetFPS(60);
 
     while (!WindowShouldClose()) {
-        cardSize = {float(GetScreenWidth() / 10),
-                    float(GetScreenWidth() / 10 / 5 * 7)};
+        int width = GetScreenWidth();
+        int height = GetScreenHeight();
+        if (height < width/13*9) {
+            cardSize = {float(GetScreenWidth() / 10),
+                        float(GetScreenWidth() / 10 / 5 * 7)};
+        } else {
+            cardSize = {float(GetScreenHeight() / 6 / 7 * 5),
+                        float(GetScreenHeight() / 6)};
+        }
+        
 
         switch (gameState) {
             case MENU:
@@ -313,35 +348,61 @@ int main() {
                 BeginDrawing();
                 ClearBackground(RAYWHITE);
 
-                //if (IsKeyPressed(KEY_R)) {
-                //    deck.initializeDeck(cardSize);
-                //    hiddenPool.initializeHiddenPool(deck);
-                //    table.initializeTable(deck, cardSize, hiddenPool);
-                //    homeCell.cells->clear();
-                //}
+                DrawTexturePro(bg, {0, 0, 884, 1080},
+                               {0, 0, 200, 300},
+                    {0, 0}, 0.0f, WHITE);
 
-                CheckMouseInput(table, hiddenPool, homeCell, cardSize);
+                if (hiddenPool.cards.empty() and hiddenPool.buffer.empty()) {
 
-                table.drawTable(cardSize, facecard, backcard);
+                    DrawText("Keep going >:')", screenWidth * 3 / 4,
+                             screenHeight * 3 / 4, 20, DARKGRAY);
+
+                    if (table.columns->empty()) {
+                        gameState = GAME_OVER;
+                    }
+                }
+
+                CheckMouseInput(table, hiddenPool, homeCell, cardSize, facecard, backcard);
+
+                table.drawTable(cardSize, facecard, backcard, cock, hiddenPool);
                 hiddenPool.drawHiddenPool(facecard, backcard, cardSize);
-                homeCell.drawHomeCells(cardSize, facecard, backcard);
+                hiddenPool.updateCoords();
+                homeCell.drawHomeCells(cardSize, facecard, backcard, slot);
+                homeCell.updateCoords();
+
+                if (selectedCard != nullptr) {
+                    selectedCard->drawCard(cardSize, facecard, backcard);
+                }
+
+                table.refreshPositions(cardSize, hiddenPool);
+                hiddenPool.refreshPositions(cardSize);
 
                 EndDrawing();
                 break;
             case GAME_OVER:
+                BeginDrawing();
+                ClearBackground(RAYWHITE);
+
+                DrawText("Ebat tbl lacker, olyx", screenWidth / 4,
+                         screenHeight / 2, 40, DARKGRAY);
+
+                EndDrawing();
                 break;
         }
     }
 
     UnloadTexture(facecard);
     UnloadTexture(backcard);
+    UnloadTexture(slot);
+    UnloadTexture(cock);
+    UnloadTexture(bg);
 
     CloseWindow();
 
     return 0;
 }
 
-void CheckMouseInput(Table& table, HiddenPool& hiddenPool, HomeCell& homeCell, Vector2 size) {
+void CheckMouseInput(Table& table, HiddenPool& hiddenPool, HomeCell& homeCell, Vector2 size, Texture2D& facecard, Texture2D& backcard) {
     Vector2 mousePos = GetMousePosition();
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
@@ -356,13 +417,15 @@ void CheckMouseInput(Table& table, HiddenPool& hiddenPool, HomeCell& homeCell, V
         hiddenPoolRec = {hiddenPool.position.x + size.x + 40, hiddenPool.position.y, size.x, size.y};
 
         if (CheckCollisionPointRec(mousePos, hiddenPoolRec)) {
-            Card& card = hiddenPool.buffer.back();
-            selectedCard = &card;
-            for (int i = 0; i < hiddenPool.buffer.size(); ++i) {
-                if (card.value == hiddenPool.buffer[i].value &&
-                    card.suit == hiddenPool.buffer[i].suit) {
-                    selectedRow = i;
-                    break;
+            if (!hiddenPool.buffer.empty()) {
+                Card& card = hiddenPool.buffer.back();
+                selectedCard = &card;
+                for (int i = 0; i < hiddenPool.buffer.size(); ++i) {
+                    if (card.value == hiddenPool.buffer[i].value &&
+                        card.suit == hiddenPool.buffer[i].suit) {
+                        selectedRow = i;
+                        break;
+                    }
                 }
             }
             return;
@@ -481,8 +544,6 @@ void CheckMouseInput(Table& table, HiddenPool& hiddenPool, HomeCell& homeCell, V
             }
         }
 
-        table.refreshPositions(size);
-        hiddenPool.refreshPositions(size);
         selectedCard = nullptr;
         selectedColumn = -1;
         selectedRow = -1;
